@@ -1,1 +1,3 @@
 /build-tools.iml
+/terraform/portainer-stack/.terraform/
+/terraform/portainer-stack/.terraform.lock.hcl
