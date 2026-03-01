@@ -26,15 +26,13 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
     source "$SCRIPT_DIR/.env"
 fi
 
-# Resolve secrets from .env.tpl via op run (re-exec with all secrets injected)
-# _OP_LOADED guards against infinite re-execution after op run re-invokes this script.
-if [ -f "$SCRIPT_DIR/.env.tpl" ] && [ -z "$_OP_LOADED" ]; then
+# Resolve secrets from .env.tpl via op inject
+if [ -f "$SCRIPT_DIR/.env.tpl" ]; then
     if ! command -v op &> /dev/null; then
         echo "Error: 'op' (1Password CLI) is not available to resolve .env.tpl"
         exit 1
     fi
-    export _OP_LOADED=1
-    exec op run --env-file "$SCRIPT_DIR/.env.tpl" -- "$0" "$@"
+    eval "$(op inject -i "$SCRIPT_DIR/.env.tpl")"
 fi
 
 # Validate required variables
