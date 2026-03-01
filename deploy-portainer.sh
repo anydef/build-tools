@@ -13,7 +13,7 @@ set -e
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TERRAFORM_DIR="${SCRIPT_DIR}/terraform"
+TERRAFORM_DIR="${TERRAFORM_DIR:-${SCRIPT_DIR}/terraform}"
 
 # Load environment variables from .env if present
 if [ -f "$SCRIPT_DIR/.env" ]; then
@@ -27,6 +27,15 @@ if [ -f "$SCRIPT_DIR/.env.tpl" ]; then
         exit 1
     fi
     eval "$(op inject -i "$SCRIPT_DIR/.env.tpl")"
+fi
+
+# Also load a project-level .env.tpl from the working directory if it exists and
+# differs from the build-tools dir. All resolved vars are auto-exported so that
+# any TF_VAR_* entries are picked up by Terraform without further wiring.
+if [ "$PWD" != "$SCRIPT_DIR" ] && [ -f "$PWD/.env.tpl" ]; then
+    set -a
+    eval "$(op inject -i "$PWD/.env.tpl")"
+    set +a
 fi
 
 # Validate required variables

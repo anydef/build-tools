@@ -37,8 +37,8 @@ fi
 
 # Validate required variables
 if [ -z "$DOCKER_IMAGE_NAME" ]; then
-    echo "Error: DOCKER_IMAGE_NAME is not set"
-    exit 1
+    echo "Warning: DOCKER_IMAGE_NAME is not set — skipping image build."
+    exit 0
 fi
 if [ -z "$DOCKER_REGISTRY" ]; then
     echo "Error: DOCKER_REGISTRY is not set (set it directly or provide .env / .env.tpl)"

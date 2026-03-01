@@ -7,7 +7,7 @@
 #   BASE_IMAGE_NAME    (optional)
 #   IMAGE_TAG          (default: latest)
 #   BUILD_CONTEXT      (default: project dir via $(CURDIR) at include time)
-#   TERRAFORM_DIR      (default: $(BUILD_CONTEXT)/terraform)
+#   TERRAFORM_DIR      (default: $(BUILD_CONTEXT)/terraform, passed to deploy-portainer.sh)
 #   BUILD_TOOLS_DIR    (default: directory of this file)
 # =============================================================================
 
@@ -32,13 +32,5 @@ build:
 	BUILD_CONTEXT=$(BUILD_CONTEXT) \
 	$(BUILD_TOOLS_DIR)/build-and-push.sh
 
-# NOTE: deploy-portainer.sh resolves TERRAFORM_DIR relative to its own SCRIPT_DIR.
-# We temporarily symlink the project terraform dir there for the duration of the call.
 deploy:
-	@bash -ec ' \
-		if [ ! -d "$(BUILD_TOOLS_DIR)/terraform" ]; then \
-			ln -s $(TERRAFORM_DIR) $(BUILD_TOOLS_DIR)/terraform; \
-			trap "rm -f $(BUILD_TOOLS_DIR)/terraform" EXIT; \
-		fi; \
-		$(BUILD_TOOLS_DIR)/deploy-portainer.sh \
-	'
+	TERRAFORM_DIR=$(TERRAFORM_DIR) $(BUILD_TOOLS_DIR)/deploy-portainer.sh

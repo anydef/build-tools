@@ -23,3 +23,9 @@ variable "force_update" {
   type        = string
   default     = ""
 }
+
+variable "extra_env" {
+  description = "Additional environment variables to inject into the Portainer stack"
+  type        = map(string)
+  default     = {}
+}

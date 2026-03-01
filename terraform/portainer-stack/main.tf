@@ -14,4 +14,12 @@ resource "portainer_stack" "this" {
     name  = "FORCE_UPDATE"
     value = var.force_update != "" ? var.force_update : "none"
   }
+
+  dynamic "env" {
+    for_each = var.extra_env
+    content {
+      name  = env.key
+      value = env.value
+    }
+  }
 }
