@@ -27,7 +27,7 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
 fi
 
 # Resolve secrets from .env.tpl via op inject
-if [ -f "$SCRIPT_DIR/.env.tpl" ]; then
+if [ -z "${_OP_LOADED:-}" ] && [ -f "$SCRIPT_DIR/.env.tpl" ]; then
     if ! command -v op &> /dev/null; then
         echo "Error: 'op' (1Password CLI) is not available to resolve .env.tpl"
         exit 1

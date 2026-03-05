@@ -21,7 +21,7 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
 fi
 
 # Resolve secrets from .env.tpl via op inject
-if [ -f "$SCRIPT_DIR/.env.tpl" ]; then
+if [ -z "${_OP_LOADED:-}" ] && [ -f "$SCRIPT_DIR/.env.tpl" ]; then
     if ! command -v op &> /dev/null; then
         echo "Error: 'op' (1Password CLI) is not available to resolve .env.tpl"
         exit 1
@@ -32,7 +32,7 @@ fi
 # Also load a project-level .env.tpl from the working directory if it exists and
 # differs from the build-tools dir. All resolved vars are auto-exported so that
 # any TF_VAR_* entries are picked up by Terraform without further wiring.
-if [ "$PWD" != "$SCRIPT_DIR" ] && [ -f "$PWD/.env.tpl" ]; then
+if [ -z "${_OP_LOADED:-}" ] && [ "$PWD" != "$SCRIPT_DIR" ] && [ -f "$PWD/.env.tpl" ]; then
     set -a
     eval "$(op inject -i "$PWD/.env.tpl")"
     set +a
