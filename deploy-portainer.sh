@@ -68,12 +68,15 @@ if ! command -v terraform &> /dev/null; then
     exit 1
 fi
 
-# Initialize Terraform if needed
-if [ ! -d "${TERRAFORM_DIR}/.terraform" ]; then
-    echo "Initializing Terraform..."
-    terraform -chdir="${TERRAFORM_DIR}" init
-    echo ""
-fi
+# Clear cached providers/modules to ensure a clean init every deployment
+echo "Clearing local Terraform cache..."
+rm -rf "${TERRAFORM_DIR}/.terraform"
+echo ""
+
+# Initialize Terraform
+echo "Initializing Terraform..."
+terraform -chdir="${TERRAFORM_DIR}" init
+echo ""
 
 # Plan the deployment
 echo "Planning deployment..."
