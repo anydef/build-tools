@@ -20,6 +20,22 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
     source "$SCRIPT_DIR/.env"
 fi
 
+# Load 1Password Connect credentials when not running in CI and not already set.
+# Must happen before any 'op inject' call so the Connect server is reachable.
+if [ -z "${GITHUB_ACTIONS:-}" ] && [ -z "${GITEA_ACTIONS:-}" ] && [ -z "${OP_CONNECT_HOST:-}" ]; then
+    if ! command -v op &> /dev/null; then
+        echo "Error: 'op' (1Password CLI) is not available to load Connect credentials"
+        exit 1
+    fi
+    export OP_CONNECT_HOST="$(op read 'op://HomeLab/1password-connect/hostname')"
+    export OP_CONNECT_TOKEN="$(op read 'op://HomeLab/1password-connect/token')"
+fi
+
+# Ensure OP_CONNECT_HOST has a URL scheme (op read returns bare host:port).
+if [ -n "${OP_CONNECT_HOST:-}" ] && [[ "${OP_CONNECT_HOST}" != http://* ]] && [[ "${OP_CONNECT_HOST}" != https://* ]]; then
+    export OP_CONNECT_HOST="http://${OP_CONNECT_HOST}"
+fi
+
 # Resolve secrets from .env.tpl via op inject
 if [ -z "${_OP_LOADED:-}" ] && [ -f "$SCRIPT_DIR/.env.tpl" ]; then
     if ! command -v op &> /dev/null; then
