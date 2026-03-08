@@ -66,7 +66,9 @@ _load_file() {
                 printf '%s<<%s\n%s\n%s\n' "$key" "__EOF_${key}__" "$value" "__EOF_${key}__" >> "$GITHUB_ENV"
             fi
         fi
-    done < <(op inject -i "$file")
+    # Strip comment lines before passing to op inject so that commented-out
+    # op:// references are not resolved.
+    done < <(grep -v '^[[:space:]]*#' "$file" | op inject)
 }
 
 for file in "${FILES[@]}"; do

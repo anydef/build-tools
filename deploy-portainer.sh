@@ -36,13 +36,20 @@ if [ -n "${OP_CONNECT_HOST:-}" ] && [[ "${OP_CONNECT_HOST}" != http://* ]] && [[
     export OP_CONNECT_HOST="http://${OP_CONNECT_HOST}"
 fi
 
-# Resolve secrets from .env.tpl via op inject
+# Resolve secrets from .env.tpl via op inject.
+# Comment lines (starting with optional whitespace + #) are stripped before
+# passing to op inject so that commented-out op:// references are not resolved.
+_inject_env_tpl() {
+    local file="$1"
+    grep -v '^[[:space:]]*#' "$file" | op inject
+}
+
 if [ -z "${_OP_LOADED:-}" ] && [ -f "$SCRIPT_DIR/.env.tpl" ]; then
     if ! command -v op &> /dev/null; then
         echo "Error: 'op' (1Password CLI) is not available to resolve .env.tpl"
         exit 1
     fi
-    eval "$(op inject -i "$SCRIPT_DIR/.env.tpl")"
+    eval "$(_inject_env_tpl "$SCRIPT_DIR/.env.tpl")"
 fi
 
 # Also load a project-level .env.tpl from the working directory if it exists and
@@ -50,7 +57,7 @@ fi
 # any TF_VAR_* entries are picked up by Terraform without further wiring.
 if [ -z "${_OP_LOADED:-}" ] && [ "$PWD" != "$SCRIPT_DIR" ] && [ -f "$PWD/.env.tpl" ]; then
     set -a
-    eval "$(op inject -i "$PWD/.env.tpl")"
+    eval "$(_inject_env_tpl "$PWD/.env.tpl")"
     set +a
 fi
 
