@@ -32,10 +32,10 @@ Test config: `serviceConfigtest` (GET)
 {
   "server": {
     "enabled": "1",
-    "name": "SONARR_server",
+    "name": "MYAPP_server",
     "description": "",
     "address": "192.168.100.10",
-    "port": "8989",
+    "port": "8080",
     "checkport": "",
     "mode": "active",
     "multiplexer_protocol": "unspecified",
@@ -67,7 +67,7 @@ Test config: `serviceConfigtest` (GET)
 {
   "backend": {
     "enabled": "1",
-    "name": "SONARR_backend",
+    "name": "MYAPP_backend",
     "description": "",
     "mode": "http",
     "algorithm": "source",
@@ -119,9 +119,9 @@ Test config: `serviceConfigtest` (GET)
 ```json
 {
   "mapfile": {
-    "name": "PUBLIC_SUBDOMAINS_mapfile",
-    "description": "Public subdomains to backend mapping",
-    "content": "home HOME_backend\nsonarr SONARR_backend\nradarr RADARR_backend"
+    "name": "EXAMPLE_LOCAL_SUBDOMAINS_mapfile",
+    "description": "Subdomains to backend mapping",
+    "content": "myapp MYAPP_backend\nanother ANOTHER_backend"
   }
 }
 ```
@@ -130,17 +130,17 @@ Test config: `serviceConfigtest` (GET)
 ```json
 {
   "acl": {
-    "name": "find_acme_challenge",
-    "description": "",
-    "expression": "path_beg",
+    "name": "example_domain_condition",
+    "description": "Match hosts ending with .example.domain.com",
+    "expression": "hdr_end",
     "negate": "0",
     "caseSensitive": "0",
     "hdr_beg": "",
-    "hdr_end": "",
+    "hdr_end": ".example.domain.com",
     "hdr": "",
     "hdr_reg": "",
     "hdr_sub": "",
-    "path_beg": "/.well-known/acme-challenge/",
+    "path_beg": "",
     "path_end": "",
     "path": "",
     "path_reg": "",
@@ -165,9 +165,9 @@ Test config: `serviceConfigtest` (GET)
 {
   "frontend": {
     "enabled": "1",
-    "name": "1_HTTPS_frontend",
+    "name": "HTTPS_frontend",
     "description": "",
-    "bind": "127.4.4.3:443",
+    "bind": "127.0.0.1:443",
     "bindOptions": "",
     "mode": "http",
     "defaultBackend": "<backend-uuid>",
@@ -210,8 +210,8 @@ Apply changes: `serviceReconfigure` (POST)
 {
   "host": {
     "enabled": "1",
-    "hostname": "sonarr",
-    "domain": "anydef.de",
+    "hostname": "myapp",
+    "domain": "example.com",
     "rr": "A",
     "mxprio": "",
     "mx": "",
@@ -234,121 +234,38 @@ Apply changes: `serviceReconfigure` (POST)
 
 ---
 
-## Current Configuration State
+## Important API Behaviors
 
-### HAProxy Servers (existing)
-| Name            | Address          | Port  | UUID |
-|-----------------|------------------|-------|------|
-| acme_challenge  | 127.0.0.1        | 43580 | 26c6ec89-722e-4a65-90c1-b3f63d0441a4 |
-| HOME_server     | 192.168.2.11     | 80    | e87dd8e4-2b3d-443b-ab4e-4c197b42895a |
-| FRITZ_server    | 192.168.1.104    | 443   | 1f2edc03-9cc2-454c-aa90-4a752ba14e95 |
-| GRAFANA_server  | 192.168.4.14     | 80    | 77625bd9-deb7-4e64-bdf5-8e516e183822 |
-| OVERSEER_server | 192.168.1.234    | 5055  | 66920882-2221-4947-b656-c23cef22c07b |
-| SONARR_server   | 192.168.1.234    | 8989  | 5b7effb9-074a-489d-9e7d-bc3afb707dbc |
-| TOWER_server    | 192.168.1.234    | 443   | 082a5e5f-748a-4fd8-a8ba-2495067d52bc |
-| TANDOOR_server  | 192.168.1.234    | 8154  | 6ec134ec-eaa8-431d-9b40-21b6af2165ba |
-| RADARR_server   | 192.168.1.234    | 7878  | 8b67664a-ebff-4805-b12a-2f069dbfb627 |
-| KELLNR_server   | 192.168.1.234    | 8000  | c1fcfa41-1a1d-4a52-a3f0-a2b756ed14ea |
-| IMMICH_server   | 192.168.1.234    | 2283  | f4ec36e4-0ef8-4ccb-bfde-d0c4731b7b12 |
-
-**Note:** Sonarr, Radarr, Overseer, Tandoor, Kellnr, Immich all point to `192.168.1.234` (Unraid/tower).
-After migration to VLAN 25, these will change to `192.168.100.x` addresses.
-
-### HAProxy Mapfiles (existing)
-**PUBLIC_SUBDOMAINS_mapfile** (4874a974-d326-4725-888c-ff3811d19943):
-```
-home       HOME_backend
-lab        HOME_backend
-overseer   OVERSEER_backend
-tandoor    TANDOOR_backend
-kellnr     KELLNR_backend
-immich     IMMICH_backend
-```
-
-**LOCAL_SUBDOMAINS_mapfile** (c0689e42-0a41-4f37-8e2c-c1d4f3c105ad):
-```
-home       HOME_backend
-lab        HOME_backend
-overseer   OVERSEER_backend
-tandoor    TANDOOR_backend
-fritz      FRITZ_backend
-grafana    GRAFANA_backend
-sonarr     SONARR_backend
-radarr     RADARR_backend
-tower      TOWER_backend
-immich     IMMICH_backend
-```
-
-### HAProxy Frontends (existing)
-| Name               | Bind           | Enabled | UUID |
-|--------------------|----------------|---------|------|
-| https (old)        | 0.0.0.0:443    | No      | a47abbd3-... |
-| 0_SNI_frontend     | 0.0.0.0:80,443 | Yes     | 3062dd18-... |
-| 1_HTTP_frontend    | 127.4.4.3:80   | Yes     | 35912271-... |
-| 1_HTTPS_frontend   | 127.4.4.3:443  | Yes     | 15949679-... |
-
-### Unbound Host Overrides (existing)
-All enabled overrides point to `192.168.1.1` (OPNsense LAN IP / HAProxy):
-| Hostname | Domain    | Server       | Enabled |
-|----------|-----------|--------------|---------|
-| home     | anydef.de | 192.168.1.1  | Yes     |
-| fritz    | anydef.de | 192.168.1.1  | Yes     |
-| grafana  | anydef.de | 192.168.1.1  | Yes     |
-| sonarr   | anydef.de | 192.168.1.1  | Yes     |
-| tower    | anydef.de | 192.168.1.1  | Yes     |
-| tandoor  | anydef.de | 192.168.1.1  | Yes     |
-| radarr   | anydef.de | 192.168.1.1  | Yes     |
-| kellnr   | anydef.de | 192.168.1.1  | Yes     |
-| immich   | anydef.de | 192.168.1.1  | Yes     |
-
-Domain: **anydef.de**
-All DNS overrides resolve `*.anydef.de` → `192.168.1.1` (OPNsense) → HAProxy routes by subdomain via mapfile.
-
----
-
-## Network Context
-
-### VLAN Layout
-| VLAN | Name          | Subnet             | Gateway        | Interface |
-|------|---------------|--------------------| ---------------|-----------|
-| -    | LAN           | 192.168.0.0/20     | 192.168.1.1    | igc1      |
-| 10   | ManagementLAN | 192.168.10.0/24    | 192.168.10.1   | igc1      |
-| 20   | GeneralLAN    | 192.168.20.0/24    | 192.168.20.1   | igc1      |
-| 25   | ServicesLAN   | 192.168.100.0/24   | 192.168.100.1  | igc1      |
-| 30   | DMZ           | 192.168.30.0/24    | 192.168.30.1   | igc1      |
-| 40   | IoT           | 192.168.40.0/24    | 192.168.40.1   | igc1      |
-| 50   | Guest         | 192.168.50.0/24    | 192.168.50.1   | igc1      |
-
-### Docker Network (Unraid)
-- Type: macvlan, external
-- Parent: eth0.25 (VLAN 25)
-- Subnet: 192.168.100.0/24
-- Gateway: 192.168.100.1
-- Auto-assign range: 192.168.100.128/25
-- Pinned IPs: 192.168.100.2-127 (managed in Docker Compose)
-
----
-
-## Terraform Module Design Notes
-
-### Workflow per service:
-1. Create HAProxy **Server** (name, IP, port)
-2. Create HAProxy **Backend** (link to server)
-3. Update **Mapfile** content (add subdomain → backend mapping)
-4. Create Unbound **Host Override** (subdomain.anydef.de → 192.168.1.1)
-5. `serviceReconfigure` on both HAProxy and Unbound
-
-### Important API behaviors:
-- All `Add` methods return `{"uuid": "..."}` on success
+- All `Add` methods return `{"uuid": "...", "result": "saved"}` on success
+- All `Add` methods return `{"result": "failed", "validations": {...}}` on validation error
+- Mapfile `content` must not be empty (use a comment like `# managed by terraform` as placeholder)
 - All `Set` methods require the UUID in the URL path
 - Select fields accept comma-separated UUIDs for multi-select
 - `serviceReconfigure` must be called after changes to apply
 - Mapfile `content` is a newline-separated string of `key value` pairs
 - Backend `linkedServers` references server UUIDs
-- Frontend `linkedActions` references action UUIDs
-- The OPNsense API uses the same REST pattern for all resources
+- Frontend `linkedActions` references action UUIDs (order matters for rule evaluation)
+- OPNsense uses POST for all write operations (add, set, del) — not standard REST PUT/DELETE
+- GET endpoints reject request bodies — do not send Content-Type or data on reads
 
-### Existing Terraform provider:
-- `browningluke/opnsense` — community provider, covers core resources
-- May not cover HAProxy plugin — verify before building custom provider
-- Alternative: use `restapi` generic provider with the schemas above
+### HAProxy map_dom behavior
+
+The `map_use_backend` action generates:
+```
+use_backend %[req.hdr(host),lower,map_dom(/path/to/mapfile)]
+```
+
+`map_dom` strips domain labels from the **right** of the input hostname and tries progressively shorter names until a match is found. For `myapp.sub.example.com`:
+1. `myapp.sub.example.com` (exact match)
+2. `myapp.sub.example`
+3. `myapp.sub`
+4. `myapp` (bare subdomain match)
+
+This means a bare key like `myapp` in the mapfile will match `myapp.anything.example.com`. To avoid conflicts between domains (e.g., `*.example.com` vs `*.sub.example.com`), use separate mapfiles with domain-specific ACLs (`hdr_end`).
+
+### Terraform provider notes
+
+- Use `Mastercard/restapi` provider v3+ with `create_returns_object = true`
+- Set `create_method`, `update_method`, `destroy_method` to `POST`
+- Set `id_attribute = "uuid"`
+- Use `ignore_server_additions = true` on resources to prevent drift from server-added fields
