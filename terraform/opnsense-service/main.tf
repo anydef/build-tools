@@ -100,6 +100,8 @@ resource "restapi_object" "haproxy_backend" {
       stickiness_expire       = "30m"
       stickiness_size         = "50k"
       tuning_httpreuse        = "safe"
+      healthCheckEnabled      = var.health_check_enabled
+      healthCheck             = var.health_check
     }
   })
 

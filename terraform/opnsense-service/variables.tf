@@ -42,6 +42,18 @@ variable "ssl" {
   default     = "0"
 }
 
+variable "health_check_enabled" {
+  description = "Enable health checking on the backend ('0' = disabled, '1' = enabled). Disabled by default to avoid false 503s on macvlan services."
+  type        = string
+  default     = "0"
+}
+
+variable "health_check" {
+  description = "Health check type (e.g., '', 'HTTP', 'TCP'). Empty string means none."
+  type        = string
+  default     = ""
+}
+
 variable "opnsense_url" {
   description = "OPNsense base URL (e.g., 'https://192.168.1.1')"
   type        = string
