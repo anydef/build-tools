@@ -93,8 +93,8 @@ resource "restapi_object" "haproxy_backend" {
       mode                    = "http"
       algorithm               = "source"
       linkedServers           = restapi_object.haproxy_server.id
-      http2Enabled            = "1"
-      ba_advertised_protocols = "h2,http11"
+      http2Enabled            = var.http2_enabled
+      ba_advertised_protocols = var.http2_enabled == "1" ? "h2,http11" : "http11"
       persistence             = "sticktable"
       stickiness_pattern      = "sourceipv4"
       stickiness_expire       = "30m"

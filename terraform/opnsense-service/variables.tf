@@ -42,6 +42,12 @@ variable "ssl" {
   default     = "0"
 }
 
+variable "http2_enabled" {
+  description = "Enable HTTP/2 on the backend ('0' = disabled, '1' = enabled). Disabled by default — most backends (e.g. nginx on plain HTTP) don't support h2c, causing sporadic 503s."
+  type        = string
+  default     = "0"
+}
+
 variable "health_check_enabled" {
   description = "Enable health checking on the backend ('0' = disabled, '1' = enabled). Disabled by default to avoid false 503s on macvlan services."
   type        = string
