@@ -1,11 +1,11 @@
 output "server_uuid" {
   description = "UUID of the created HAProxy server"
-  value       = restapi_object.haproxy_server.id
+  value       = data.external.haproxy_server.result.uuid
 }
 
 output "backend_uuid" {
   description = "UUID of the created HAProxy backend"
-  value       = restapi_object.haproxy_backend.id
+  value       = data.external.haproxy_backend.result.uuid
 }
 
 output "backend_name" {

@@ -55,14 +55,29 @@ data "external" "mapfile_lookup" {
 # -----------------------------------------------------------------------------
 # HAProxy Server
 # -----------------------------------------------------------------------------
-resource "restapi_object" "haproxy_server" {
-  path         = "/api/haproxy/settings/addServer"
-  read_path    = "/api/haproxy/settings/getServer/{id}"
-  update_path  = "/api/haproxy/settings/setServer/{id}"
-  destroy_path = "/api/haproxy/settings/delServer/{id}"
-  id_attribute = "uuid"
+# Create-or-update the server and return its UUID. The external data source is
+# idempotent: it looks up an existing server by name first and only creates when
+# none is found.  This avoids the restapi_object read-back bug where OPNsense
+# returns array fields that the provider cannot unmarshal.
+# -----------------------------------------------------------------------------
+data "external" "haproxy_server" {
+  program = ["/bin/bash", "-c", <<-EOT
+    set -e
+    SETTINGS=$(curl -s -k -u "${local.curl_auth}" \
+      "${var.opnsense_url}/api/haproxy/settings/get")
 
-  data = jsonencode({
+    UUID=$(echo "$SETTINGS" | jq -r --arg name "${local.server_name}" '
+      .haproxy.servers.server
+      | to_entries[]
+      | select(.value.name == $name)
+      | .key' | head -1)
+
+    if [ -n "$UUID" ] && [ "$UUID" != "null" ]; then
+      # Update the existing server
+      curl -s -k -u "${local.curl_auth}" \
+        -X POST "${var.opnsense_url}/api/haproxy/settings/setServer/$UUID" \
+        -H "Content-Type: application/json" \
+        -d '${jsonencode({
     server = {
       enabled   = "1"
       name      = local.server_name
@@ -71,28 +86,79 @@ resource "restapi_object" "haproxy_server" {
       ssl       = var.ssl
       sslVerify = "0"
     }
-  })
+    })}' > /dev/null
+      jq -n --arg uuid "$UUID" '{"uuid": $uuid}'
+    else
+      # Create a new server
+      RESPONSE=$(curl -s -k -u "${local.curl_auth}" \
+        -X POST "${var.opnsense_url}/api/haproxy/settings/addServer" \
+        -H "Content-Type: application/json" \
+        -d '${jsonencode({
+    server = {
+      enabled   = "1"
+      name      = local.server_name
+      address   = var.address
+      port      = local.port_str
+      ssl       = var.ssl
+      sslVerify = "0"
+    }
+})}')
+      UUID=$(echo "$RESPONSE" | jq -r '.uuid')
+      if [ -z "$UUID" ] || [ "$UUID" = "null" ]; then
+        echo "Failed to create server: $RESPONSE" >&2
+        exit 1
+      fi
+      jq -n --arg uuid "$UUID" '{"uuid": $uuid}'
+    fi
+  EOT
+]
+}
 
-  ignore_server_additions = true
+resource "terraform_data" "haproxy_server" {
+  input = {
+    uuid         = data.external.haproxy_server.result.uuid
+    opnsense_url = var.opnsense_url
+    curl_auth    = local.curl_auth
+  }
+
+  provisioner "local-exec" {
+    when        = destroy
+    command     = <<-EOT
+      set -e
+      curl -s -k -u "${self.input.curl_auth}" \
+        -X POST "${self.input.opnsense_url}/api/haproxy/settings/delServer/${self.input.uuid}" \
+        -H "Content-Type: application/json" \
+        -d '{}'
+    EOT
+    interpreter = ["/bin/bash", "-c"]
+  }
 }
 
 # -----------------------------------------------------------------------------
 # HAProxy Backend
 # -----------------------------------------------------------------------------
-resource "restapi_object" "haproxy_backend" {
-  path         = "/api/haproxy/settings/addBackend"
-  read_path    = "/api/haproxy/settings/getBackend/{id}"
-  update_path  = "/api/haproxy/settings/setBackend/{id}"
-  destroy_path = "/api/haproxy/settings/delBackend/{id}"
-  id_attribute = "uuid"
+# Same idempotent create-or-update pattern as the server above.
+# -----------------------------------------------------------------------------
+data "external" "haproxy_backend" {
+  program = ["/bin/bash", "-c", <<-EOT
+    set -e
+    SERVER_UUID="${data.external.haproxy_server.result.uuid}"
 
-  data = jsonencode({
+    SETTINGS=$(curl -s -k -u "${local.curl_auth}" \
+      "${var.opnsense_url}/api/haproxy/settings/get")
+
+    UUID=$(echo "$SETTINGS" | jq -r --arg name "${local.backend_name}" '
+      .haproxy.backends.backend
+      | to_entries[]
+      | select(.value.name == $name)
+      | .key' | head -1)
+
+    PAYLOAD='${jsonencode({
     backend = {
       enabled                 = "1"
       name                    = local.backend_name
       mode                    = "http"
       algorithm               = "source"
-      linkedServers           = restapi_object.haproxy_server.id
       http2Enabled            = var.http2_enabled
       ba_advertised_protocols = var.http2_enabled == "1" ? "h2,http11" : "http11"
       persistence             = "sticktable"
@@ -103,9 +169,52 @@ resource "restapi_object" "haproxy_backend" {
       healthCheckEnabled      = var.health_check_enabled
       healthCheck             = var.health_check
     }
-  })
+})}'
+    # Inject linkedServers into the payload (needs the server UUID)
+    PAYLOAD=$(echo "$PAYLOAD" | jq --arg srv "$SERVER_UUID" '.backend.linkedServers = $srv')
 
-  ignore_server_additions = true
+    if [ -n "$UUID" ] && [ "$UUID" != "null" ]; then
+      curl -s -k -u "${local.curl_auth}" \
+        -X POST "${var.opnsense_url}/api/haproxy/settings/setBackend/$UUID" \
+        -H "Content-Type: application/json" \
+        -d "$PAYLOAD" > /dev/null
+      jq -n --arg uuid "$UUID" '{"uuid": $uuid}'
+    else
+      RESPONSE=$(curl -s -k -u "${local.curl_auth}" \
+        -X POST "${var.opnsense_url}/api/haproxy/settings/addBackend" \
+        -H "Content-Type: application/json" \
+        -d "$PAYLOAD")
+      UUID=$(echo "$RESPONSE" | jq -r '.uuid')
+      if [ -z "$UUID" ] || [ "$UUID" = "null" ]; then
+        echo "Failed to create backend: $RESPONSE" >&2
+        exit 1
+      fi
+      jq -n --arg uuid "$UUID" '{"uuid": $uuid}'
+    fi
+  EOT
+]
+
+depends_on = [terraform_data.haproxy_server]
+}
+
+resource "terraform_data" "haproxy_backend" {
+  input = {
+    uuid         = data.external.haproxy_backend.result.uuid
+    opnsense_url = var.opnsense_url
+    curl_auth    = local.curl_auth
+  }
+
+  provisioner "local-exec" {
+    when        = destroy
+    command     = <<-EOT
+      set -e
+      curl -s -k -u "${self.input.curl_auth}" \
+        -X POST "${self.input.opnsense_url}/api/haproxy/settings/delBackend/${self.input.uuid}" \
+        -H "Content-Type: application/json" \
+        -d '{}'
+    EOT
+    interpreter = ["/bin/bash", "-c"]
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -160,7 +269,7 @@ resource "terraform_data" "local_mapfile_entry" {
     interpreter = ["/bin/bash", "-c"]
   }
 
-  depends_on = [restapi_object.haproxy_backend]
+  depends_on = [terraform_data.haproxy_backend]
 }
 
 # PUBLIC mapfile — only updated when var.public is true
@@ -213,7 +322,7 @@ resource "terraform_data" "public_mapfile_entry" {
     interpreter = ["/bin/bash", "-c"]
   }
 
-  depends_on = [restapi_object.haproxy_backend]
+  depends_on = [terraform_data.haproxy_backend]
 }
 
 # -----------------------------------------------------------------------------
@@ -244,9 +353,9 @@ resource "restapi_object" "dns_host_override" {
 # -----------------------------------------------------------------------------
 resource "terraform_data" "haproxy_reconfigure" {
   input = {
-    server_id     = restapi_object.haproxy_server.id
-    backend_id    = restapi_object.haproxy_backend.id
-    local_mapfile = terraform_data.local_mapfile_entry.id
+    server_id      = data.external.haproxy_server.result.uuid
+    backend_id     = data.external.haproxy_backend.result.uuid
+    local_mapfile  = terraform_data.local_mapfile_entry.id
     public_mapfile = var.public ? terraform_data.public_mapfile_entry[0].id : ""
   }
 
