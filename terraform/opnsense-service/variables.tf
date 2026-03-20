@@ -60,6 +60,24 @@ variable "health_check" {
   default     = ""
 }
 
+variable "use_direct_rules" {
+  description = "Use per-service ACL+action rules instead of shared mapfiles. Avoids read-modify-write race conditions on shared mapfiles."
+  type        = bool
+  default     = true
+}
+
+variable "local_subnet_acl_uuid" {
+  description = "UUID of the LOCAL_SUBDOMAINS_SUBNETS_condition ACL (src 192.168.0.0/20). Required when use_direct_rules=true."
+  type        = string
+  default     = ""
+}
+
+variable "https_frontend_uuid" {
+  description = "UUID of the 1_HTTPS_frontend to link actions to. Required when use_direct_rules=true."
+  type        = string
+  default     = ""
+}
+
 variable "opnsense_url" {
   description = "OPNsense base URL (e.g., 'https://192.168.1.1')"
   type        = string

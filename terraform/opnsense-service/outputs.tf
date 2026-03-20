@@ -18,14 +18,24 @@ output "dns_override_uuid" {
   value       = restapi_object.dns_host_override.id
 }
 
+output "acl_uuid" {
+  description = "UUID of the per-service ACL (only when use_direct_rules=true)"
+  value       = var.use_direct_rules ? data.external.haproxy_acl[0].result.uuid : ""
+}
+
+output "action_uuid" {
+  description = "UUID of the per-service action (only when use_direct_rules=true)"
+  value       = var.use_direct_rules ? data.external.haproxy_action[0].result.uuid : ""
+}
+
 output "local_mapfile_uuid" {
-  description = "UUID of the resolved LOCAL HAProxy mapfile"
-  value       = local.local_mapfile_uuid
+  description = "UUID of the resolved LOCAL HAProxy mapfile (only when use_direct_rules=false)"
+  value       = var.use_direct_rules ? "" : local.local_mapfile_uuid
 }
 
 output "public_mapfile_uuid" {
-  description = "UUID of the resolved PUBLIC HAProxy mapfile"
-  value       = local.public_mapfile_uuid
+  description = "UUID of the resolved PUBLIC HAProxy mapfile (only when use_direct_rules=false)"
+  value       = var.use_direct_rules ? "" : local.public_mapfile_uuid
 }
 
 output "service_url" {
