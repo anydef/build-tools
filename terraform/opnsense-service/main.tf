@@ -404,8 +404,9 @@ resource "terraform_data" "frontend_link" {
       if echo ",$CURRENT," | grep -q ",$ACTION_UUID,"; then
         echo "Action already linked to frontend"
       else
-        NEW_ACTIONS="$CURRENT,$ACTION_UUID"
-        NEW_ACTIONS=$(echo "$NEW_ACTIONS" | sed 's/^,//')
+        # Prepend: per-service rules must come before catch-all mapfile rules
+        NEW_ACTIONS="$ACTION_UUID,$CURRENT"
+        NEW_ACTIONS=$(echo "$NEW_ACTIONS" | sed 's/,$//')
         curl -s -k -u "${local.curl_auth}" \
           -X POST "${var.opnsense_url}/api/haproxy/settings/setFrontend/${var.https_frontend_uuid}" \
           -H "Content-Type: application/json" \
