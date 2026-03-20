@@ -331,7 +331,7 @@ data "external" "haproxy_action" {
       --arg desc "Route ${local.fqdn} to ${local.backend_name}" \
       --arg acls "$LINKED_ACLS" \
       --arg backend "$BACKEND_UUID" \
-      '{action: {name: $name, description: $desc, type: "use_backend", testType: "if", linkedAcls: $acls, operator: "and", useBackend: $backend}}')
+      '{action: {name: $name, description: $desc, type: "use_backend", testType: "if", linkedAcls: $acls, operator: "and", use_backend: $backend}}')
 
     if [ -n "$UUID" ] && [ "$UUID" != "null" ]; then
       curl -s -k -u "${local.curl_auth}" \
