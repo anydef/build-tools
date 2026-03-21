@@ -109,8 +109,24 @@ data "external" "haproxy_setup" {
       fi
     }
 
-    # --- Fetch full settings ONCE ---
-    SETTINGS=$(curl -s -k -u "$AUTH" "$URL/api/haproxy/settings/get")
+    # --- Fetch settings (or use pre-fetched) ---
+    # Cache settings to a temp file — shared across parallel module instances
+    # within the same terraform run. Avoids hammering the OPNsense API.
+    CACHE="/tmp/.haproxy_settings_cache.json"
+    CACHE_MAX_AGE=60
+    NOW=$(date +%s)
+    if [ -f "$CACHE" ]; then
+      FILE_AGE=$(stat -c %Y "$CACHE" 2>/dev/null || stat -f %m "$CACHE" 2>/dev/null || echo 0)
+      AGE=$(( NOW - FILE_AGE ))
+    else
+      AGE=999
+    fi
+    if [ "$AGE" -lt "$CACHE_MAX_AGE" ]; then
+      SETTINGS=$(cat "$CACHE")
+    else
+      SETTINGS=$(curl -s -k -u "$AUTH" "$URL/api/haproxy/settings/get")
+      echo "$SETTINGS" > "$CACHE"
+    fi
 
     # --- Server ---
     SERVER_UUID=$(find_or_create "server" "${local.server_name}" \
