@@ -81,23 +81,35 @@ data "external" "haproxy_setup" {
       }
     })}'
 
+    # --- Timing helper ---
+    T_START=$(date +%s%3N 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))")
+    log_timing() {
+      local NOW=$(date +%s%3N 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))")
+      local ELAPSED=$(( NOW - T_START ))
+      echo "[${var.service_name}] ${ELAPSED}ms $1" >&2
+    }
+
     # --- Helper: find or create a resource ---
     # Usage: find_or_create <type> <name> <add_path> <set_path> <payload> <jq_path>
     # Returns UUID on stdout
     find_or_create() {
       local TYPE="$1" NAME="$2" ADD_PATH="$3" SET_PATH="$4" PAYLOAD="$5" JQ_PATH="$6"
 
+      log_timing "find $TYPE '$NAME'..."
       # Try to find by name in the cached settings
       local UUID=$(echo "$SETTINGS" | jq -r --arg name "$NAME" \
         "$JQ_PATH | to_entries[] | select(.value.name == \$name) | .key" | head -1)
 
       if [ -n "$UUID" ] && [ "$UUID" != "null" ]; then
         # Update existing
+        log_timing "update $TYPE '$NAME' ($UUID)..."
         curl -s -k -u "$AUTH" -X POST "$URL$SET_PATH/$UUID" \
           -H "Content-Type: application/json" -d "$PAYLOAD" > /dev/null
+        log_timing "update $TYPE '$NAME' done"
         echo "$UUID"
       else
         # Create new
+        log_timing "create $TYPE '$NAME'..."
         local RESPONSE=$(curl -s -k -u "$AUTH" -X POST "$URL$ADD_PATH" \
           -H "Content-Type: application/json" -d "$PAYLOAD")
         local NEW_UUID=$(echo "$RESPONSE" | jq -r '.uuid')
@@ -105,6 +117,7 @@ data "external" "haproxy_setup" {
           echo "Failed to create $TYPE '$NAME': $RESPONSE" >&2
           exit 1
         fi
+        log_timing "create $TYPE '$NAME' done ($NEW_UUID)"
         echo "$NEW_UUID"
       fi
     }
@@ -122,10 +135,14 @@ data "external" "haproxy_setup" {
       AGE=999
     fi
     if [ "$AGE" -lt "$CACHE_MAX_AGE" ]; then
+      log_timing "reading settings from cache"
       SETTINGS=$(cat "$CACHE")
+      log_timing "cache read done"
     else
+      log_timing "fetching settings from API..."
       SETTINGS=$(curl -s -k -u "$AUTH" "$URL/api/haproxy/settings/get")
       echo "$SETTINGS" > "$CACHE"
+      log_timing "API fetch done"
     fi
 
     # --- Server ---
@@ -148,6 +165,7 @@ data "external" "haproxy_setup" {
     ACTION_UUID=""
     FRONTEND_UUID=""
     if [ "$USE_DIRECT" = "true" ]; then
+      log_timing "looking up subnet ACL and frontend by name..."
       # Look up subnet ACL and frontend UUIDs by name
       SUBNET_ACL_UUID=$(echo "$SETTINGS" | jq -r --arg name "$SUBNET_ACL_NAME" \
         '.haproxy.acls.acl | to_entries[] | select(.value.name == $name) | .key' | head -1)
@@ -186,6 +204,7 @@ data "external" "haproxy_setup" {
         ".haproxy.actions.action")
     fi
 
+    log_timing "done — emitting result"
     jq -n \
       --arg server_uuid "$SERVER_UUID" \
       --arg backend_uuid "$BACKEND_UUID" \
