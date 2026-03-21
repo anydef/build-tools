@@ -82,11 +82,12 @@ data "external" "haproxy_setup" {
     })}'
 
     # --- Timing helper ---
+    SVC_NAME="${var.service_name}"
     T_START=$(date +%s%3N 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))")
     log_timing() {
       local NOW=$(date +%s%3N 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))")
       local ELAPSED=$(( NOW - T_START ))
-      echo "[${var.service_name}] ${ELAPSED}ms $1" >&2
+      echo "[$SVC_NAME] $${ELAPSED}ms $1" >&2
     }
 
     # --- Helper: find or create a resource ---
