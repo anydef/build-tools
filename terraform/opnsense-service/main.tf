@@ -36,7 +36,8 @@ data "external" "haproxy_setup" {
     URL="${var.opnsense_url}"
     USE_DIRECT="${var.use_direct_rules}"
     PUBLIC="${var.public}"
-    SUBNET_ACL="${var.local_subnet_acl_uuid}"
+    SUBNET_ACL_NAME="${var.local_subnet_acl_name}"
+    FRONTEND_NAME="${var.https_frontend_name}"
 
     SERVER_PAYLOAD='${jsonencode({
       server = {
@@ -129,7 +130,19 @@ data "external" "haproxy_setup" {
     # --- ACL + Action (only for direct rules) ---
     ACL_UUID=""
     ACTION_UUID=""
+    FRONTEND_UUID=""
     if [ "$USE_DIRECT" = "true" ]; then
+      # Look up subnet ACL and frontend UUIDs by name
+      SUBNET_ACL_UUID=$(echo "$SETTINGS" | jq -r --arg name "$SUBNET_ACL_NAME" \
+        '.haproxy.acls.acl | to_entries[] | select(.value.name == $name) | .key' | head -1)
+      FRONTEND_UUID=$(echo "$SETTINGS" | jq -r --arg name "$FRONTEND_NAME" \
+        '.haproxy.frontends.frontend | to_entries[] | select(.value.name == $name) | .key' | head -1)
+
+      if [ -z "$FRONTEND_UUID" ] || [ "$FRONTEND_UUID" = "null" ]; then
+        echo "Frontend '$FRONTEND_NAME' not found" >&2
+        exit 1
+      fi
+
       ACL_UUID=$(find_or_create "acl" "${local.acl_name}" \
         "/api/haproxy/settings/addAcl" \
         "/api/haproxy/settings/setAcl" \
@@ -137,8 +150,8 @@ data "external" "haproxy_setup" {
         ".haproxy.acls.acl")
 
       # Build linkedAcls
-      if [ -n "$SUBNET_ACL" ] && [ "$PUBLIC" = "false" ]; then
-        LINKED_ACLS="$ACL_UUID,$SUBNET_ACL"
+      if [ -n "$SUBNET_ACL_UUID" ] && [ "$SUBNET_ACL_UUID" != "null" ] && [ "$PUBLIC" = "false" ]; then
+        LINKED_ACLS="$ACL_UUID,$SUBNET_ACL_UUID"
       else
         LINKED_ACLS="$ACL_UUID"
       fi
@@ -162,7 +175,8 @@ data "external" "haproxy_setup" {
       --arg backend_uuid "$BACKEND_UUID" \
       --arg acl_uuid "$ACL_UUID" \
       --arg action_uuid "$ACTION_UUID" \
-      '{"server_uuid":$server_uuid,"backend_uuid":$backend_uuid,"acl_uuid":$acl_uuid,"action_uuid":$action_uuid}'
+      --arg frontend_uuid "$FRONTEND_UUID" \
+      '{"server_uuid":$server_uuid,"backend_uuid":$backend_uuid,"acl_uuid":$acl_uuid,"action_uuid":$action_uuid,"frontend_uuid":$frontend_uuid}'
   EOT
   ]
 }
@@ -236,11 +250,11 @@ resource "terraform_data" "haproxy_action" {
 # =============================================================================
 
 resource "terraform_data" "frontend_link" {
-  count = var.use_direct_rules && var.https_frontend_uuid != "" ? 1 : 0
+  count = var.use_direct_rules ? 1 : 0
 
   input = {
     action_uuid   = data.external.haproxy_setup.result.action_uuid
-    frontend_uuid = var.https_frontend_uuid
+    frontend_uuid = data.external.haproxy_setup.result.frontend_uuid
     opnsense_url  = var.opnsense_url
     curl_auth     = local.curl_auth
   }
@@ -248,8 +262,9 @@ resource "terraform_data" "frontend_link" {
   provisioner "local-exec" {
     command     = <<-EOT
       set -e
+      FRONTEND_UUID="${data.external.haproxy_setup.result.frontend_uuid}"
       FRONTEND=$(curl -s -k -u "${local.curl_auth}" \
-        "${var.opnsense_url}/api/haproxy/settings/getFrontend/${var.https_frontend_uuid}")
+        "${var.opnsense_url}/api/haproxy/settings/getFrontend/$FRONTEND_UUID")
       CURRENT=$(echo "$FRONTEND" | jq -r '[.frontend.linkedActions | to_entries[] | select(.value.selected == 1) | .key] | join(",")')
       ACTION_UUID="${data.external.haproxy_setup.result.action_uuid}"
 
@@ -260,7 +275,7 @@ resource "terraform_data" "frontend_link" {
         NEW_ACTIONS="$ACTION_UUID,$CURRENT"
         NEW_ACTIONS=$(echo "$NEW_ACTIONS" | sed 's/,$//')
         curl -s -k -u "${local.curl_auth}" \
-          -X POST "${var.opnsense_url}/api/haproxy/settings/setFrontend/${var.https_frontend_uuid}" \
+          -X POST "${var.opnsense_url}/api/haproxy/settings/setFrontend/$FRONTEND_UUID" \
           -H "Content-Type: application/json" \
           -d "$(jq -n --arg actions "$NEW_ACTIONS" '{"frontend": {"linkedActions": $actions}}')" > /dev/null
       fi
@@ -460,7 +475,7 @@ resource "terraform_data" "haproxy_reconfigure" {
   input = var.use_direct_rules ? {
     server_id      = data.external.haproxy_setup.result.server_uuid
     backend_id     = data.external.haproxy_setup.result.backend_uuid
-    frontend_link  = var.https_frontend_uuid != "" ? terraform_data.frontend_link[0].id : ""
+    frontend_link  = terraform_data.frontend_link[0].id
     local_mapfile  = ""
     public_mapfile = ""
   } : {

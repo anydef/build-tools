@@ -66,16 +66,16 @@ variable "use_direct_rules" {
   default     = true
 }
 
-variable "local_subnet_acl_uuid" {
-  description = "UUID of the LOCAL_SUBDOMAINS_SUBNETS_condition ACL (src 192.168.0.0/20). Required when use_direct_rules=true."
+variable "local_subnet_acl_name" {
+  description = "Name of the ACL that restricts access to local subnets (e.g., LOCAL_SUBDOMAINS_SUBNETS_condition). Looked up by name at runtime."
   type        = string
-  default     = ""
+  default     = "LOCAL_SUBDOMAINS_SUBNETS_condition"
 }
 
-variable "https_frontend_uuid" {
-  description = "UUID of the 1_HTTPS_frontend to link actions to. Required when use_direct_rules=true."
+variable "https_frontend_name" {
+  description = "Name of the HTTPS frontend to link actions to (e.g., 1_HTTPS_frontend). Looked up by name at runtime."
   type        = string
-  default     = ""
+  default     = "1_HTTPS_frontend"
 }
 
 variable "opnsense_url" {
