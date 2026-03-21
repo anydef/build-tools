@@ -527,12 +527,11 @@ resource "terraform_data" "haproxy_reconfigure" {
   provisioner "local-exec" {
     command     = <<-EOT
       set -e
-      # Stop HAProxy, then start to ensure a single clean process.
-      # Graceful reload (reconfigure) can leave stale processes with
-      # outdated configs that return 503 for valid requests.
-      curl -s -k -u '${local.curl_auth}' -X POST '${var.opnsense_url}/api/haproxy/service/stop'
-      sleep 2
-      curl -s -k -u '${local.curl_auth}' -X POST '${var.opnsense_url}/api/haproxy/service/start'
+      # Restart HAProxy to apply config changes.
+      # Using restart (not reconfigure) to avoid stale processes from
+      # graceful reloads that keep outdated configs and cause slow API
+      # responses and intermittent 503s.
+      curl -s -k -u '${local.curl_auth}' -X POST '${var.opnsense_url}/api/haproxy/service/restart'
     EOT
     interpreter = ["/bin/bash", "-c"]
   }
