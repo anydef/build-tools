@@ -83,12 +83,14 @@ data "external" "haproxy_setup" {
 
     # --- Timing helper ---
     SVC_NAME="${var.service_name}"
-    T_START=$(date +%s%3N 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))")
+    LOGFILE="/tmp/haproxy_setup_$SVC_NAME.log"
+    T_START=$(date +%s)
     log_timing() {
-      local NOW=$(date +%s%3N 2>/dev/null || python3 -c "import time; print(int(time.time()*1000))")
-      local ELAPSED=$(( NOW - T_START ))
-      echo "[$SVC_NAME] $${ELAPSED}ms $1" >&2
+      local ELAPSED=$(( $(date +%s) - T_START ))
+      echo "[$SVC_NAME] +$${ELAPSED}s $1" | tee -a "$LOGFILE" >&2
     }
+    : > "$LOGFILE"
+    log_timing "start"
 
     # --- Helper: find or create a resource ---
     # Usage: find_or_create <type> <name> <add_path> <set_path> <payload> <jq_path>
@@ -205,7 +207,7 @@ data "external" "haproxy_setup" {
         ".haproxy.actions.action")
     fi
 
-    log_timing "done — emitting result"
+    log_timing "done"
     jq -n \
       --arg server_uuid "$SERVER_UUID" \
       --arg backend_uuid "$BACKEND_UUID" \
