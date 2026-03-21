@@ -510,6 +510,8 @@ resource "restapi_object" "dns_host_override" {
 # =============================================================================
 
 resource "terraform_data" "haproxy_reconfigure" {
+  count = var.skip_reconfigure ? 0 : 1
+
   input = var.use_direct_rules ? {
     server_id      = data.external.haproxy_setup.result.server_uuid
     backend_id     = data.external.haproxy_setup.result.backend_uuid
@@ -528,9 +530,6 @@ resource "terraform_data" "haproxy_reconfigure" {
     command     = <<-EOT
       set -e
       # Restart HAProxy to apply config changes.
-      # Using restart (not reconfigure) to avoid stale processes from
-      # graceful reloads that keep outdated configs and cause slow API
-      # responses and intermittent 503s.
       curl -s -k -u '${local.curl_auth}' -X POST '${var.opnsense_url}/api/haproxy/service/restart'
     EOT
     interpreter = ["/bin/bash", "-c"]
