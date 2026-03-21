@@ -1,11 +1,11 @@
 output "server_uuid" {
   description = "UUID of the created HAProxy server"
-  value       = data.external.haproxy_server.result.uuid
+  value       = data.external.haproxy_setup.result.server_uuid
 }
 
 output "backend_uuid" {
   description = "UUID of the created HAProxy backend"
-  value       = data.external.haproxy_backend.result.uuid
+  value       = data.external.haproxy_setup.result.backend_uuid
 }
 
 output "backend_name" {
@@ -13,19 +13,19 @@ output "backend_name" {
   value       = local.backend_name
 }
 
-output "dns_override_uuid" {
-  description = "UUID of the created Unbound host override"
-  value       = restapi_object.dns_host_override.id
-}
-
 output "acl_uuid" {
   description = "UUID of the per-service ACL (only when use_direct_rules=true)"
-  value       = var.use_direct_rules ? data.external.haproxy_acl[0].result.uuid : ""
+  value       = data.external.haproxy_setup.result.acl_uuid
 }
 
 output "action_uuid" {
   description = "UUID of the per-service action (only when use_direct_rules=true)"
-  value       = var.use_direct_rules ? data.external.haproxy_action[0].result.uuid : ""
+  value       = data.external.haproxy_setup.result.action_uuid
+}
+
+output "dns_override_uuid" {
+  description = "UUID of the created Unbound host override"
+  value       = restapi_object.dns_host_override.id
 }
 
 output "local_mapfile_uuid" {
