@@ -40,12 +40,13 @@ data "external" "haproxy_setup" {
 
     SERVER_PAYLOAD='${jsonencode({
       server = {
-        enabled   = "1"
-        name      = local.server_name
-        address   = var.address
-        port      = local.port_str
-        ssl       = var.ssl
-        sslVerify = "0"
+        enabled     = "1"
+        name        = local.server_name
+        description = "[terraform] Server for ${var.service_name} at ${var.address}:${local.port_str}"
+        address     = var.address
+        port        = local.port_str
+        ssl         = var.ssl
+        sslVerify   = "0"
       }
     })}'
 
@@ -53,6 +54,7 @@ data "external" "haproxy_setup" {
       backend = {
         enabled                 = "1"
         name                    = local.backend_name
+        description             = "[terraform] Backend pool for ${var.service_name} (${local.fqdn})"
         mode                    = "http"
         algorithm               = "source"
         http2Enabled            = var.http2_enabled
@@ -70,7 +72,7 @@ data "external" "haproxy_setup" {
     ACL_PAYLOAD='${jsonencode({
       acl = {
         name          = local.acl_name
-        description   = "Host matches ${local.fqdn}"
+        description   = "[terraform] Match requests for ${local.fqdn}"
         expression    = "hdr"
         hdr           = local.fqdn
         negate        = "0"
@@ -143,7 +145,7 @@ data "external" "haproxy_setup" {
 
       ACTION_PAYLOAD=$(jq -n \
         --arg name "${local.action_name}" \
-        --arg desc "Route ${local.fqdn} to ${local.backend_name}" \
+        --arg desc "[terraform] Route ${local.fqdn} to ${local.backend_name}" \
         --arg acls "$LINKED_ACLS" \
         --arg backend "$BACKEND_UUID" \
         '{action: {name: $name, description: $desc, type: "use_backend", testType: "if", linkedAcls: $acls, operator: "and", use_backend: $backend}}')
