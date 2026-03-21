@@ -66,6 +66,12 @@ variable "use_direct_rules" {
   default     = true
 }
 
+variable "skip_reconfigure" {
+  description = "Skip HAProxy reconfigure after changes. Set to true when multiple modules run together and you want to reconfigure once at the end."
+  type        = bool
+  default     = false
+}
+
 variable "local_subnet_acl_name" {
   description = "Name of the ACL that restricts access to local subnets (e.g., LOCAL_SUBDOMAINS_SUBNETS_condition). Looked up by name at runtime."
   type        = string
