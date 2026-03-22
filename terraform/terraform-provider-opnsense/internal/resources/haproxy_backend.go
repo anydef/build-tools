@@ -2,7 +2,6 @@ package resources
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -205,8 +204,9 @@ func (r *HAProxyBackendResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
+	// result parsed below
+	result, err := ParseResponse(body)
+	if err != nil {
 		resp.Diagnostics.AddError("Error parsing HAProxy backend response", err.Error())
 		return
 	}

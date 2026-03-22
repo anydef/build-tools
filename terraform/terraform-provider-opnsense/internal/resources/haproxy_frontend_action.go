@@ -2,7 +2,6 @@ package resources
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -91,8 +90,9 @@ func (r *HAProxyFrontendActionResource) getLinkedActions(ctx context.Context, fr
 		return nil, fmt.Errorf("failed to read frontend: %w", err)
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
+	// result parsed below
+	result, err := ParseResponse(body)
+	if err != nil {
 		return nil, fmt.Errorf("failed to parse frontend response: %w", err)
 	}
 

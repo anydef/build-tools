@@ -2,7 +2,6 @@ package resources
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -143,8 +142,9 @@ func (r *UnboundHostOverrideResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
+	// result parsed below
+	result, err := ParseResponse(body)
+	if err != nil {
 		resp.Diagnostics.AddError("Error parsing Unbound host override response", err.Error())
 		return
 	}

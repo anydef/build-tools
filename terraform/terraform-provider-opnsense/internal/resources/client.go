@@ -160,6 +160,34 @@ func (c *OPNsenseClient) Post(ctx context.Context, path string) error {
 	return err
 }
 
+// ParseResponse unmarshals a JSON response body into a map, handling the case
+// where OPNsense returns an array instead of an object. If the response is an
+// array, the first element is used.
+func ParseResponse(body []byte) (map[string]interface{}, error) {
+	// Try map first (normal case)
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err == nil {
+		return result, nil
+	}
+
+	// Try array (OPNsense sometimes wraps responses in arrays)
+	var arr []interface{}
+	if err := json.Unmarshal(body, &arr); err == nil && len(arr) > 0 {
+		if m, ok := arr[0].(map[string]interface{}); ok {
+			return m, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unable to parse response as object or array: %s", string(body[:min(200, len(body))]))
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // extractStringField safely extracts a string field from a nested map.
 // OPNsense API responses may contain arrays, maps, or strings for any field.
 // This function handles all cases gracefully.
