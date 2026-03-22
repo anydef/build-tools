@@ -95,6 +95,9 @@ data "external" "haproxy_setup" {
     # --- Helper: find or create a resource ---
     # Usage: find_or_create <type> <name> <add_path> <set_path> <payload> <jq_path>
     # Returns UUID on stdout
+    # On plan/refresh: finds existing by name (read-only from cached settings).
+    # Only creates via API if the resource doesn't exist yet.
+    # Updates are handled separately by terraform_data provisioners.
     find_or_create() {
       local TYPE="$1" NAME="$2" ADD_PATH="$3" SET_PATH="$4" PAYLOAD="$5" JQ_PATH="$6"
 
@@ -104,14 +107,10 @@ data "external" "haproxy_setup" {
         "$JQ_PATH | to_entries[] | select(.value.name == \$name) | .key" | head -1)
 
       if [ -n "$UUID" ] && [ "$UUID" != "null" ]; then
-        # Update existing
-        log_timing "update $TYPE '$NAME' ($UUID)..."
-        curl -s -k -u "$AUTH" -X POST "$URL$SET_PATH/$UUID" \
-          -H "Content-Type: application/json" -d "$PAYLOAD" > /dev/null
-        log_timing "update $TYPE '$NAME' done"
+        log_timing "found $TYPE '$NAME' ($UUID)"
         echo "$UUID"
       else
-        # Create new
+        # Create new (only on first run)
         log_timing "create $TYPE '$NAME'..."
         local RESPONSE=$(curl -s -k -u "$AUTH" -X POST "$URL$ADD_PATH" \
           -H "Content-Type: application/json" -d "$PAYLOAD")
