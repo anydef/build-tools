@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -206,8 +207,12 @@ func (r *HAProxyBackendResource) Read(ctx context.Context, req resource.ReadRequ
 
 	// result parsed below
 	result, err := ParseResponse(body)
+	if errors.Is(err, ErrResourceNotFound) {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error parsing HAProxy backend response", err.Error())
+		resp.Diagnostics.AddError("Error parsing response", err.Error())
 		return
 	}
 

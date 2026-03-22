@@ -160,9 +160,12 @@ func (c *OPNsenseClient) Post(ctx context.Context, path string) error {
 	return err
 }
 
+// ErrResourceNotFound indicates the resource no longer exists in OPNsense.
+var ErrResourceNotFound = fmt.Errorf("resource not found")
+
 // ParseResponse unmarshals a JSON response body into a map, handling the case
 // where OPNsense returns an array instead of an object. If the response is an
-// array, the first element is used.
+// empty array, returns ErrResourceNotFound (resource was deleted).
 func ParseResponse(body []byte) (map[string]interface{}, error) {
 	// Try map first (normal case)
 	var result map[string]interface{}
@@ -172,7 +175,10 @@ func ParseResponse(body []byte) (map[string]interface{}, error) {
 
 	// Try array (OPNsense sometimes wraps responses in arrays)
 	var arr []interface{}
-	if err := json.Unmarshal(body, &arr); err == nil && len(arr) > 0 {
+	if err := json.Unmarshal(body, &arr); err == nil {
+		if len(arr) == 0 {
+			return nil, ErrResourceNotFound
+		}
 		if m, ok := arr[0].(map[string]interface{}); ok {
 			return m, nil
 		}
