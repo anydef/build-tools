@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var _ resource.Resource = &HAProxyFrontendActionResource{}
@@ -54,11 +53,8 @@ func (r *HAProxyFrontendActionResource) Schema(_ context.Context, _ resource.Sch
 				},
 			},
 			"action_id": schema.StringAttribute{
-				Description: "UUID of the action to link.",
+				Description: "Comma-separated UUIDs of actions to link to the frontend.",
 				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"prepend": schema.BoolAttribute{
 				Description: "Prepend the action before existing actions (true) or append after (false). Per-service rules should be prepended before catch-all mapfile rules.",
@@ -154,7 +150,7 @@ func (r *HAProxyFrontendActionResource) Create(ctx context.Context, req resource
 	}
 
 	frontendID := plan.FrontendID.ValueString()
-	actionID := plan.ActionID.ValueString()
+	actionIDs := strings.Split(plan.ActionID.ValueString(), ",")
 
 	current, err := r.getLinkedActions(ctx, frontendID)
 	if err != nil {
@@ -162,33 +158,36 @@ func (r *HAProxyFrontendActionResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	// Check if already linked
+	// Build set of current actions for quick lookup
+	currentSet := make(map[string]bool)
 	for _, id := range current {
-		if id == actionID {
-			tflog.Info(ctx, "Action already linked to frontend", map[string]interface{}{
-				"frontend_id": frontendID,
-				"action_id":   actionID,
-			})
-			plan.ID = types.StringValue(frontendID + "/" + actionID)
-			resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		currentSet[id] = true
+	}
+
+	// Find actions not yet linked
+	var toAdd []string
+	for _, id := range actionIDs {
+		id = strings.TrimSpace(id)
+		if id != "" && !currentSet[id] {
+			toAdd = append(toAdd, id)
+		}
+	}
+
+	if len(toAdd) > 0 {
+		var newActions []string
+		if plan.Prepend.ValueBool() {
+			newActions = append(toAdd, current...)
+		} else {
+			newActions = append(current, toAdd...)
+		}
+
+		if err := r.setLinkedActions(ctx, frontendID, newActions); err != nil {
+			resp.Diagnostics.AddError("Error linking actions to frontend", err.Error())
 			return
 		}
 	}
 
-	// Prepend or append
-	var newActions []string
-	if plan.Prepend.ValueBool() {
-		newActions = append([]string{actionID}, current...)
-	} else {
-		newActions = append(current, actionID)
-	}
-
-	if err := r.setLinkedActions(ctx, frontendID, newActions); err != nil {
-		resp.Diagnostics.AddError("Error linking action to frontend", err.Error())
-		return
-	}
-
-	plan.ID = types.StringValue(frontendID + "/" + actionID)
+	plan.ID = types.StringValue(frontendID + "/" + plan.ActionID.ValueString())
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -201,7 +200,7 @@ func (r *HAProxyFrontendActionResource) Read(ctx context.Context, req resource.R
 	}
 
 	frontendID := state.FrontendID.ValueString()
-	actionID := state.ActionID.ValueString()
+	actionIDs := strings.Split(state.ActionID.ValueString(), ",")
 
 	current, err := r.getLinkedActions(ctx, frontendID)
 	if err != nil {
@@ -209,16 +208,23 @@ func (r *HAProxyFrontendActionResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	found := false
+	currentSet := make(map[string]bool)
 	for _, id := range current {
-		if id == actionID {
-			found = true
+		currentSet[id] = true
+	}
+
+	// Check all action IDs are linked
+	allLinked := true
+	for _, id := range actionIDs {
+		id = strings.TrimSpace(id)
+		if id != "" && !currentSet[id] {
+			allLinked = false
 			break
 		}
 	}
 
-	if !found {
-		// Action is no longer linked - remove from state
+	if !allLinked {
+		// Some actions are no longer linked - remove from state so they get recreated
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -257,7 +263,7 @@ func (r *HAProxyFrontendActionResource) Delete(ctx context.Context, req resource
 	}
 
 	frontendID := state.FrontendID.ValueString()
-	actionID := state.ActionID.ValueString()
+	actionIDs := strings.Split(state.ActionID.ValueString(), ",")
 
 	current, err := r.getLinkedActions(ctx, frontendID)
 	if err != nil {
@@ -265,16 +271,25 @@ func (r *HAProxyFrontendActionResource) Delete(ctx context.Context, req resource
 		return
 	}
 
-	// Remove the action from the list
+	// Build set of actions to remove
+	removeSet := make(map[string]bool)
+	for _, id := range actionIDs {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			removeSet[id] = true
+		}
+	}
+
+	// Filter out removed actions
 	var newActions []string
 	for _, id := range current {
-		if id != actionID {
+		if !removeSet[id] {
 			newActions = append(newActions, id)
 		}
 	}
 
 	if err := r.setLinkedActions(ctx, frontendID, newActions); err != nil {
-		resp.Diagnostics.AddError("Error unlinking action from frontend", err.Error())
+		resp.Diagnostics.AddError("Error unlinking actions from frontend", err.Error())
 		return
 	}
 }
