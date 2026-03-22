@@ -1,5 +1,5 @@
 name: Setup OPNsense Terraform Provider
-description: Build and install the OPNsense Terraform provider for local use via dev_overrides.
+description: Build and install the OPNsense Terraform provider into the local plugin cache.
 
 inputs:
   build-tools-dir:
@@ -15,21 +15,17 @@ runs:
         go-version: '1.22'
         cache-dependency-path: ${{ inputs.build-tools-dir }}/terraform/terraform-provider-opnsense/go.sum
 
-    - name: Build OPNsense provider
+    - name: Build and install OPNsense provider
       shell: bash
       working-directory: ${{ inputs.build-tools-dir }}/terraform/terraform-provider-opnsense
-      run: go build -o terraform-provider-opnsense
-
-    - name: Configure Terraform dev_overrides
-      shell: bash
       run: |
-        PROVIDER_DIR="${{ inputs.build-tools-dir }}/terraform/terraform-provider-opnsense"
-        cat > ~/.terraformrc << EOF
-        provider_installation {
-          dev_overrides {
-            "registry.terraform.io/anydef/opnsense" = "$PROVIDER_DIR"
-          }
-          direct {}
-        }
-        EOF
-        echo "OPNsense provider installed via dev_overrides at $PROVIDER_DIR"
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+        esac
+        PLUGIN_DIR="$HOME/.terraform.d/plugins/registry.terraform.io/anydef/opnsense/0.1.0/${OS}_${ARCH}"
+        mkdir -p "$PLUGIN_DIR"
+        go build -o "$PLUGIN_DIR/terraform-provider-opnsense"
+        echo "OPNsense provider installed to $PLUGIN_DIR"
