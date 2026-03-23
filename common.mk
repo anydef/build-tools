@@ -18,7 +18,7 @@ BUILD_CONTEXT ?= $(CURDIR)
 IMAGE_TAG     ?= latest
 TERRAFORM_DIR ?= $(BUILD_CONTEXT)/terraform
 
-.PHONY: build deploy help
+.PHONY: build deploy deploy-tf help
 
 help:
 	@echo "Targets:"
@@ -34,3 +34,6 @@ build:
 
 deploy:
 	TERRAFORM_DIR=$(TERRAFORM_DIR) $(BUILD_TOOLS_DIR)/deploy-portainer.sh
+
+deploy-tf:
+	TERRAFORM_DIR=$(TERRAFORM_DIR) $(BUILD_TOOLS_DIR)/deploy-terraform.sh

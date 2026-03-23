@@ -3,9 +3,10 @@
 Shared build and deployment tooling for Docker + Portainer projects.
 
 Provides:
-- **`common.mk`** — reusable Makefile targets for building/pushing Docker images and deploying to Portainer
+- **`common.mk`** — reusable Makefile targets for building/pushing Docker images and deploying via Terraform
 - **`build-and-push.sh`** — Docker build and push script with optional base-image support
-- **`deploy-portainer.sh`** — Terraform-based Portainer stack deployment
+- **`deploy-portainer.sh`** — Terraform-based Portainer stack deployment (requires Portainer + Docker registry)
+- **`deploy-terraform.sh`** — Terraform-only deployment (no Portainer/Docker registry required)
 - **`terraform/portainer-stack`** — reusable Terraform module that creates a Portainer stack
 
 ---
@@ -80,10 +81,13 @@ Add `.build/` to your `.gitignore`:
 ### 3. Available targets
 
 ```
-make help    # List available targets
-make build   # Build and push Docker image(s)
-make deploy  # Deploy stack to Portainer via Terraform
+make help       # List available targets
+make build      # Build and push Docker image(s)
+make deploy     # Deploy stack to Portainer via Terraform (requires Portainer + Docker registry)
+make deploy-tf  # Deploy Terraform only (no Portainer/Docker registry required)
 ```
+
+Use `deploy-tf` for infrastructure-only projects (e.g. DNS, HAProxy, firewall rules) that don't manage Docker images or Portainer stacks.
 
 ### 4. Base image (optional)
 
@@ -209,6 +213,8 @@ output "stack_name" { value = module.portainer_stack.stack_name }
 
 ## End-to-end workflow
 
+### Full stack (Docker + Portainer)
+
 ```bash
 # 1. First run — auto-clones build-tools, then builds and pushes images
 make build
@@ -222,6 +228,31 @@ make deploy
 2. Show a plan and prompt for confirmation
 3. Apply with `-auto-approve` after confirmation
 4. Print Terraform outputs
+
+### Terraform only (no Docker/Portainer)
+
+```bash
+# Deploy infrastructure (DNS, HAProxy, etc.) without Portainer
+make deploy-tf
+```
+
+`make deploy-tf` will:
+1. Load secrets from `.env.tpl` via 1Password (or use pre-loaded `_OP_LOADED=1`)
+2. Initialize Terraform
+3. Show a plan and prompt for confirmation
+4. Apply with `-auto-approve` after confirmation
+
+Minimal Makefile for a terraform-only project:
+
+```makefile
+TERRAFORM_DIR := $(CURDIR)
+
+BUILD_TOOLS_DIR := .build/build-tools
+
+-include $(BUILD_TOOLS_DIR)/common.mk
+$(BUILD_TOOLS_DIR)/common.mk:
+	git clone --depth=1 https://github.com/anydef/build-tools $(BUILD_TOOLS_DIR)
+```
 
 ---
 
