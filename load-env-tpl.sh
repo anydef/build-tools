@@ -9,15 +9,16 @@ set -e
 #   load-env-tpl.sh [file1.env.tpl [file2.env.tpl ...]]
 #
 # With no arguments, loads:
-#   1. <SCRIPT_DIR>/.env.tpl  (build-tools base secrets)
-#   2. $PWD/.env.tpl          (project-level secrets, if PWD != SCRIPT_DIR)
+#   1. <script dir>/.env.tpl  (build-tools base secrets)
+#   2. $PWD/.env.tpl          (project-level secrets, if PWD != script dir)
 #
 # Resolves op:// references via the op CLI, strips surrounding quotes from
 # values, exports vars to the current shell, and — when $GITHUB_ENV is set —
 # appends them in heredoc format for cross-step availability in CI.
 # =============================================================================
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Use a private name to avoid clobbering SCRIPT_DIR in any sourcing script.
+_LOAD_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if ! command -v op &> /dev/null; then
     echo "Error: 'op' (1Password CLI) is not installed or not in PATH"
@@ -29,8 +30,8 @@ if [ "$#" -gt 0 ]; then
     FILES=("$@")
 else
     FILES=()
-    [ -f "$SCRIPT_DIR/.env.tpl" ] && FILES+=("$SCRIPT_DIR/.env.tpl")
-    if [ "$PWD" != "$SCRIPT_DIR" ] && [ -f "$PWD/.env.tpl" ]; then
+    [ -f "$_LOAD_ENV_DIR/.env.tpl" ] && FILES+=("$_LOAD_ENV_DIR/.env.tpl")
+    if [ "$PWD" != "$_LOAD_ENV_DIR" ] && [ -f "$PWD/.env.tpl" ]; then
         FILES+=("$PWD/.env.tpl")
     fi
 fi
