@@ -14,9 +14,19 @@
 # Resolve BUILD_TOOLS_DIR to the directory containing this file when not set.
 BUILD_TOOLS_DIR ?= $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
-BUILD_CONTEXT ?= $(CURDIR)
-IMAGE_TAG     ?= latest
-TERRAFORM_DIR ?= $(BUILD_CONTEXT)/terraform
+BUILD_CONTEXT        ?= $(CURDIR)
+IMAGE_TAG            ?= latest
+TERRAFORM_DIR        ?= $(BUILD_CONTEXT)/terraform
+ANSIBLE_INVENTORY    ?= $(BUILD_CONTEXT)/hosts.yaml
+ANSIBLE_PLAYBOOK_DIR ?= $(BUILD_CONTEXT)/ansible
+
+# run_ansible <playbook-filename>
+# Runs a playbook from ANSIBLE_PLAYBOOK_DIR using the shared run-ansible.sh.
+define run_ansible
+	ANSIBLE_INVENTORY=$(ANSIBLE_INVENTORY) \
+	ENV_FILE=$(BUILD_CONTEXT)/.env.tpl \
+	$(BUILD_TOOLS_DIR)/run-ansible.sh $(ANSIBLE_PLAYBOOK_DIR)/$(1)
+endef
 
 .PHONY: build deploy deploy-tf help
 
