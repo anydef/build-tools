@@ -21,14 +21,16 @@ type HAProxyActionResource struct {
 }
 
 type HAProxyActionModel struct {
-	ID         types.String `tfsdk:"id"`
-	Name       types.String `tfsdk:"name"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
-	Type       types.String `tfsdk:"type"`
-	TestType   types.String `tfsdk:"test_type"`
-	LinkedACLs types.String `tfsdk:"linked_acls"`
-	Operator   types.String `tfsdk:"operator"`
-	UseBackend types.String `tfsdk:"use_backend"`
+	Type        types.String `tfsdk:"type"`
+	TestType    types.String `tfsdk:"test_type"`
+	LinkedACLs  types.String `tfsdk:"linked_acls"`
+	Operator    types.String `tfsdk:"operator"`
+	UseBackend  types.String `tfsdk:"use_backend"`
+	ActionName  types.String `tfsdk:"action_name"`
+	ActionValue types.String `tfsdk:"action_value"`
 }
 
 func NewHAProxyActionResource() resource.Resource {
@@ -86,6 +88,18 @@ func (r *HAProxyActionResource) Schema(_ context.Context, _ resource.SchemaReque
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
 			},
+			"action_name": schema.StringAttribute{
+				Description: "Header name or action target (for http-request_set-header, http-request_del-header, etc.).",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"action_value": schema.StringAttribute{
+				Description: "Header value or action expression (for http-request_set-header, etc.).",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
 		},
 	}
 }
@@ -112,6 +126,8 @@ func (r *HAProxyActionResource) buildPayload(plan *HAProxyActionModel) map[strin
 			"linkedAcls":  plan.LinkedACLs.ValueString(),
 			"operator":    plan.Operator.ValueString(),
 			"use_backend": plan.UseBackend.ValueString(),
+			"actionName":  plan.ActionName.ValueString(),
+			"actionValue": plan.ActionValue.ValueString(),
 		},
 	}
 }
@@ -172,6 +188,8 @@ func (r *HAProxyActionResource) Read(ctx context.Context, req resource.ReadReque
 	state.LinkedACLs = types.StringValue(extractSelectedUUIDs(data, "linkedAcls"))
 	state.Operator = types.StringValue(extractExpressionValue(data, "operator"))
 	state.UseBackend = types.StringValue(extractSelectedUUIDs(data, "use_backend"))
+	state.ActionName = types.StringValue(extractStringField(data, "actionName"))
+	state.ActionValue = types.StringValue(extractStringField(data, "actionValue"))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
