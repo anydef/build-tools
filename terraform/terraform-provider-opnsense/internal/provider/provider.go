@@ -93,6 +93,7 @@ func (p *OPNsenseProvider) Resources(_ context.Context) []func() resource.Resour
 		resources.NewHAProxyBackendResource,
 		resources.NewHAProxyACLResource,
 		resources.NewHAProxyActionResource,
+		resources.NewHAProxyFrontendResource,
 		resources.NewHAProxyFrontendActionResource,
 		resources.NewHAProxyReconfigureResource,
 		resources.NewUnboundHostOverrideResource,
