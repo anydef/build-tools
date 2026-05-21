@@ -4,9 +4,11 @@ Shared build and deployment tooling for Docker + Portainer projects.
 
 Provides:
 - **`common.mk`** — reusable Makefile targets for building/pushing Docker images and deploying via Terraform
+- **`cargo.mk`** — reusable Makefile targets for cross-compiling Rust binaries and publishing crates to a Gitea cargo registry
 - **`build-and-push.sh`** — Docker build and push script with optional base-image support
 - **`deploy-portainer.sh`** — Terraform-based Portainer stack deployment (requires Portainer + Docker registry)
 - **`deploy-terraform.sh`** — Terraform-only deployment (no Portainer/Docker registry required)
+- **`run-ansible.sh`** — runs an Ansible playbook with 1Password secret injection from `.env.tpl`
 - **`terraform/portainer-stack`** — reusable Terraform module that creates a Portainer stack
 
 ---
@@ -256,6 +258,72 @@ $(BUILD_TOOLS_DIR)/common.mk:
 
 ---
 
-## Reference project
+## cargo.mk — Rust cross-compile and Gitea cargo publish
 
-[resawod-scheduler](https://github.com/anydef/resawod-scheduler) is a full working example of a project using this repo.
+For Rust projects that cross-compile to a non-host target and publish to a Gitea
+cargo registry, include `cargo.mk` instead of `common.mk`:
+
+```makefile
+CARGO_TARGET  := arm-unknown-linux-musleabi
+PRIMARY_BIN   := my_service
+SECONDARY_BIN := my_service_cli   # optional, extra binaries included in the tarball
+
+BUILD_TOOLS_DIR := .build/build-tools
+
+-include $(BUILD_TOOLS_DIR)/cargo.mk
+$(BUILD_TOOLS_DIR)/cargo.mk:
+	git clone --depth=1 https://github.com/anydef/build-tools $(BUILD_TOOLS_DIR)
+```
+
+### Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `CARGO_TARGET` | yes | — | Rust target triple (e.g. `arm-unknown-linux-musleabi`) |
+| `PRIMARY_BIN` | yes | — | Primary binary name (matches `[[bin]]` in `Cargo.toml`) |
+| `SECONDARY_BIN` | no | — | Extra binary names included in the package tarball |
+| `PKG_VERSION` | no | scraped from `Cargo.toml` | Crate version used in tarball name |
+| `CARGO` | no | `cross` | Build tool (CI overrides to `cargo` when the runner is already a cross toolchain) |
+| `ENV_FILE` | no | `$(BUILD_CONTEXT)/.env.tpl` | 1Password-templated env file |
+
+### Targets
+
+```
+make build      # cross-compile release binaries with $(CARGO) for $(CARGO_TARGET)
+make package    # tar binaries into dist/
+make publish    # cargo publish to the gitea registry (uses Bearer-prefixed token)
+
+# Invoked from CI workflows (see below)
+make ci-build   # build with CARGO=cargo (bypass `cross`)
+make ci-package # package with CARGO=cargo
+make ci-publish # publish, tolerating "already exists" so version bumps drive publishes
+```
+
+### CI workflow shape
+
+Workflows declare `runs-on:` a label that maps to a pre-baked Rust toolchain
+image (see `tower/rust-cross-builder` in the homelab repo). The workflow:
+
+1. checks out the project,
+2. loads secrets from `.env.tpl` via `1password/load-secrets-action`,
+3. clones build-tools via `make .build/build-tools/cargo.mk`,
+4. runs `make ci-build`, `make ci-package`,
+5. uploads the tarball with `https://github.com/akkuman/gitea-release-action`,
+6. runs `make ci-publish` to push the crate.
+
+The release upload step is deliberately a workflow action (not a Makefile
+target) so `cargo.mk` stays free of `tea` / `curl` / `jq` plumbing.
+
+The expected token in CI's env (after 1Password injection):
+
+| Env var | 1Password ref (example) | Used by |
+|---|---|---|
+| `CARGO_REGISTRIES_GITEA_TOKEN` | `op://HomeLab/Gitea/cargo-publish-token` | `publish` / `ci-publish` |
+| `GITEA_TOKEN` | `op://HomeLab/Gitea/release-token` | `akkuman/gitea-release-action` |
+
+---
+
+## Reference projects
+
+- [resawod-scheduler](https://github.com/anydef/resawod-scheduler) — Docker + Portainer (uses `common.mk`).
+- [electricity-meter-rs](https://gitea.lab.anydef.de/anydef/electricity-meter-rs) — Rust cross-compile + Gitea release/cargo publish (uses `cargo.mk`).
