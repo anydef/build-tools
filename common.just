@@ -10,12 +10,11 @@
 #   terraform_dir      (default: build_context/terraform)
 #   ansible_inventory  (default: build_context/hosts.yaml)
 #   ansible_playbook_dir (default: build_context/ansible)
-#   build_tools_dir    (default: justfile_directory()/.build/build-tools)
+#   build_tools_dir    (REQUIRED — caller must provide; typically from bootstrap.just)
 #
 # Variables defined in the importing justfile take precedence (shallower wins).
 # =============================================================================
 
-build_tools_dir       := justfile_directory() / ".build/build-tools"
 build_context         := justfile_directory()
 image_tag             := env_var_or_default("IMAGE_TAG", "latest")
 terraform_dir         := build_context / "terraform"
@@ -42,8 +41,9 @@ deploy-tf:
     TERRAFORM_DIR={{terraform_dir}} {{build_tools_dir}}/deploy-terraform.sh
 
 # Run an Ansible playbook from ansible_playbook_dir.
-# Usage: just run-ansible <playbook-filename>
-run-ansible playbook:
+# Usage: just run-ansible <playbook-filename> [extra ansible-playbook args]
+# Example: just run-ansible foo.yaml --tags argocd
+run-ansible playbook *args:
     ANSIBLE_INVENTORY={{ansible_inventory}} \
     ENV_FILE={{build_context}}/.env.tpl \
-    {{build_tools_dir}}/run-ansible.sh {{ansible_playbook_dir}}/{{playbook}}
+    {{build_tools_dir}}/run-ansible.sh {{ansible_playbook_dir}}/{{playbook}} {{args}}
