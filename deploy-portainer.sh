@@ -91,14 +91,17 @@ if ! command -v terraform &> /dev/null; then
     exit 1
 fi
 
-# Clear cached providers/modules to ensure a clean init every deployment
+# Clear cached providers/modules to ensure a clean init every deployment.
+# State lives in the S3 (Garage) backend, so nothing local is authoritative —
+# nuking the cache is always safe.
 echo "Clearing local Terraform cache..."
-rm -rf "${TERRAFORM_DIR}/.terraform"
+rm -rf "${TERRAFORM_DIR}/.terraform" "${TERRAFORM_DIR}/.terraform.lock.hcl"
 echo ""
 
-# Initialize Terraform
+# Initialize Terraform. -reconfigure forces re-evaluation of backend + module
+# sources even if a stale .terraform somehow survived the cleanup above.
 echo "Initializing Terraform..."
-terraform -chdir="${TERRAFORM_DIR}" init
+terraform -chdir="${TERRAFORM_DIR}" init -reconfigure -upgrade
 echo ""
 
 # Plan the deployment
