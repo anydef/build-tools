@@ -24,6 +24,12 @@ variable "force_update" {
   default     = ""
 }
 
+variable "pull_image" {
+  description = "Pull latest images on update, so floating tags (e.g. `release`, `latest`) actually refresh instead of reusing whatever's cached locally"
+  type        = bool
+  default     = true
+}
+
 variable "extra_env" {
   description = "Additional environment variables to inject into the Portainer stack"
   type        = map(string)

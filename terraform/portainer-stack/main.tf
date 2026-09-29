@@ -4,6 +4,7 @@ resource "portainer_stack" "this" {
   deployment_type    = "standalone"
   method             = "string"
   stack_file_content = var.stack_file_content
+  pull_image         = var.pull_image
 
   env {
     name  = "DOCKER_REGISTRY"
